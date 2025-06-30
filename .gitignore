@@ -10,6 +10,8 @@
 !*.gst
 
 # Don't ignore docs
+!/docs/
+!/docs/**
 !*.md
 
 # Don't ignore github files
