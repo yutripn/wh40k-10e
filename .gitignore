@@ -18,5 +18,11 @@
 
 # Don't ignore .yml for CI build definitions
 !*.yml
+!*.json
+!*.py
+!/docs
+!/docs/**
+!/scripts
+!/scripts/**
 Chaos - Renegade Militarum.cat
 Zephyran Corsairs.cat
