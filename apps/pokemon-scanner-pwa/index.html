@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0f172a" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="stylesheet" href="./styles.css" />
+    <title>Pokemon Scanner</title>
+  </head>
+  <body>
+    <header>
+      <h1>Pokemon Card Scanner</h1>
+      <p>Personal cross-platform tool (iPhone + Windows)</p>
+    </header>
+
+    <main>
+      <section class="card">
+        <h2>1) Find Card</h2>
+        <div class="field-row">
+          <label for="setSearch">Set</label>
+          <input id="setSearch" type="text" placeholder="Search set (e.g. Surging Sparks)" />
+          <button id="loadSetsBtn">Load Sets</button>
+        </div>
+        <div class="field-row">
+          <label for="setSelect">Choose Set</label>
+          <select id="setSelect"></select>
+        </div>
+        <div class="field-row">
+          <label for="cardNumber">Collector #</label>
+          <input id="cardNumber" type="text" placeholder="e.g. 25" />
+        </div>
+        <div class="field-row">
+          <label for="nameFilter">Card Name</label>
+          <input id="nameFilter" type="text" placeholder="Optional name filter" />
+        </div>
+        <button id="findCardBtn">Find Card + Pricing</button>
+        <p id="status"></p>
+      </section>
+
+      <section class="card">
+        <h2>2) Camera Helper (optional)</h2>
+        <p>Open your camera while typing card details from the physical card.</p>
+        <div class="camera-wrap">
+          <video id="video" autoplay playsinline muted></video>
+          <canvas id="snapshot" hidden></canvas>
+        </div>
+        <div class="button-row">
+          <button id="startCameraBtn">Start Camera</button>
+          <button id="stopCameraBtn">Stop Camera</button>
+          <button id="snapBtn">Capture Reference</button>
+        </div>
+        <img id="preview" alt="Captured preview" />
+      </section>
+
+      <section class="card">
+        <h2>3) Match Result</h2>
+        <div id="result"></div>
+        <button id="saveBtn" disabled>Save to Collection</button>
+      </section>
+
+      <section class="card">
+        <h2>My Collection (local only)</h2>
+        <ul id="collectionList"></ul>
+        <button id="clearCollectionBtn">Clear Collection</button>
+      </section>
+    </main>
+
+    <script src="./app.js" type="module"></script>
+  </body>
+</html>
