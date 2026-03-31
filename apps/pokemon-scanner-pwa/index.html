@@ -7,36 +7,40 @@
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="stylesheet" href="./styles.css" />
     <title>Pokemon Scanner</title>
-    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
   </head>
   <body>
     <header>
       <h1>Pokemon Card Scanner</h1>
-      <p>Scan-first workflow + set locking (iPhone + Windows)</p>
+      <p>Personal cross-platform tool (iPhone + Windows)</p>
     </header>
 
     <main>
       <section class="card">
-        <h2>1) Lock Sets</h2>
-        <p>Limit scan results to your active sets (ex: Ascended Heroes + Mega Evolutions).</p>
+        <h2>1) Find Card</h2>
         <div class="field-row">
-          <label for="setSearch">Find Set</label>
-          <input id="setSearch" type="text" placeholder="Search set name" />
+          <label for="setSearch">Set</label>
+          <input id="setSearch" type="text" placeholder="Search set (e.g. Surging Sparks)" />
+          <button id="loadSetsBtn">Load Sets</button>
         </div>
         <div class="field-row">
-          <label for="setSelect">Set</label>
+          <label for="setSelect">Choose Set</label>
           <select id="setSelect"></select>
-          <button id="addLockBtn">Add Lock</button>
         </div>
-        <div>
-          <strong>Locked Sets</strong>
-          <ul id="lockedSetList"></ul>
+        <div class="field-row">
+          <label for="cardNumber">Collector #</label>
+          <input id="cardNumber" type="text" placeholder="e.g. 25" />
         </div>
+        <div class="field-row">
+          <label for="nameFilter">Card Name</label>
+          <input id="nameFilter" type="text" placeholder="Optional name filter" />
+        </div>
+        <button id="findCardBtn">Find Card + Pricing</button>
+        <p id="status"></p>
       </section>
 
       <section class="card">
-        <h2>2) Scan Card</h2>
-        <p>Start camera, point at card text, then run OCR scan.</p>
+        <h2>2) Camera Helper (optional)</h2>
+        <p>Open your camera while typing card details from the physical card.</p>
         <div class="camera-wrap">
           <video id="video" autoplay playsinline muted></video>
           <canvas id="snapshot" hidden></canvas>
@@ -44,24 +48,15 @@
         <div class="button-row">
           <button id="startCameraBtn">Start Camera</button>
           <button id="stopCameraBtn">Stop Camera</button>
-          <button id="scanBtn">Scan From Camera</button>
+          <button id="snapBtn">Capture Reference</button>
         </div>
         <img id="preview" alt="Captured preview" />
-        <div class="field-row">
-          <label for="cardNumber">Detected Collector #</label>
-          <input id="cardNumber" type="text" placeholder="Auto-filled from OCR" />
-        </div>
-        <div class="field-row">
-          <label for="nameFilter">Detected Card Name</label>
-          <input id="nameFilter" type="text" placeholder="Auto-filled from OCR" />
-        </div>
-        <button id="findCardBtn">Find Matches</button>
-        <p id="status"></p>
       </section>
 
       <section class="card">
-        <h2>3) Choose Match + Variant</h2>
+        <h2>3) Match Result</h2>
         <div id="result"></div>
+        <button id="saveBtn" disabled>Save to Collection</button>
       </section>
 
       <section class="card">

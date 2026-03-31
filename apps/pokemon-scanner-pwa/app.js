@@ -1,67 +1,48 @@
 const API_BASE = 'https://tcgtracking.com/tcgapi/v1';
 const POKEMON_CATEGORY = 3;
-const collectionKey = 'pokemon-scanner-collection-v1';
-const lockedSetsKey = 'pokemon-scanner-locked-sets-v1';
 
 const state = {
   sets: [],
+  selectedCard: null,
   stream: null,
-  setCache: new Map(),
-  priceCache: new Map(),
-  lockedSetIds: new Set(),
 };
 
 const el = {
   setSearch: document.getElementById('setSearch'),
+  loadSetsBtn: document.getElementById('loadSetsBtn'),
   setSelect: document.getElementById('setSelect'),
-  addLockBtn: document.getElementById('addLockBtn'),
-  lockedSetList: document.getElementById('lockedSetList'),
   cardNumber: document.getElementById('cardNumber'),
   nameFilter: document.getElementById('nameFilter'),
   findCardBtn: document.getElementById('findCardBtn'),
   status: document.getElementById('status'),
   result: document.getElementById('result'),
+  saveBtn: document.getElementById('saveBtn'),
   collectionList: document.getElementById('collectionList'),
   clearCollectionBtn: document.getElementById('clearCollectionBtn'),
   startCameraBtn: document.getElementById('startCameraBtn'),
   stopCameraBtn: document.getElementById('stopCameraBtn'),
-  scanBtn: document.getElementById('scanBtn'),
+  snapBtn: document.getElementById('snapBtn'),
   video: document.getElementById('video'),
   preview: document.getElementById('preview'),
   snapshot: document.getElementById('snapshot'),
 };
 
+const collectionKey = 'pokemon-scanner-collection-v1';
+
 function setStatus(message) {
   el.status.textContent = message;
 }
 
-function readJsonStorage(key, fallback) {
+function readCollection() {
   try {
-    return JSON.parse(localStorage.getItem(key) ?? JSON.stringify(fallback));
+    return JSON.parse(localStorage.getItem(collectionKey) ?? '[]');
   } catch {
-    return fallback;
+    return [];
   }
 }
 
-function writeJsonStorage(key, value) {
-  localStorage.setItem(key, JSON.stringify(value));
-}
-
-function readCollection() {
-  return readJsonStorage(collectionKey, []);
-}
-
 function writeCollection(list) {
-  writeJsonStorage(collectionKey, list);
-}
-
-function loadLockedSets() {
-  const ids = readJsonStorage(lockedSetsKey, []);
-  state.lockedSetIds = new Set(ids.map(String));
-}
-
-function saveLockedSets() {
-  writeJsonStorage(lockedSetsKey, [...state.lockedSetIds]);
+  localStorage.setItem(collectionKey, JSON.stringify(list));
 }
 
 function renderCollection() {
@@ -77,7 +58,7 @@ function renderCollection() {
 
   list.forEach((item, idx) => {
     const li = document.createElement('li');
-    li.textContent = `${item.name} [${item.setName}] #${item.number} (${item.variant}) — $${item.market ?? 'n/a'}`;
+    li.textContent = `${item.name} [${item.setName}] #${item.number} — $${item.market ?? 'n/a'}`;
     const removeBtn = document.createElement('button');
     removeBtn.textContent = 'Remove';
     removeBtn.style.marginLeft = '0.5rem';
@@ -92,34 +73,6 @@ function renderCollection() {
   });
 }
 
-function renderLockedSets() {
-  el.lockedSetList.innerHTML = '';
-  const ids = [...state.lockedSetIds];
-
-  if (ids.length === 0) {
-    const li = document.createElement('li');
-    li.textContent = 'No set locks active. Scanner checks all sets.';
-    el.lockedSetList.appendChild(li);
-    return;
-  }
-
-  ids.forEach((id) => {
-    const set = state.sets.find((x) => String(x.id) === id);
-    const li = document.createElement('li');
-    li.textContent = set ? `${set.name} (${set.abbr ?? 'N/A'})` : `Set #${id}`;
-    const removeBtn = document.createElement('button');
-    removeBtn.textContent = 'Unlock';
-    removeBtn.style.marginLeft = '0.5rem';
-    removeBtn.addEventListener('click', () => {
-      state.lockedSetIds.delete(id);
-      saveLockedSets();
-      renderLockedSets();
-    });
-    li.appendChild(removeBtn);
-    el.lockedSetList.appendChild(li);
-  });
-}
-
 async function fetchJson(url) {
   const response = await fetch(url);
   if (!response.ok) {
@@ -128,9 +81,9 @@ async function fetchJson(url) {
   return response.json();
 }
 
-function populateSetSelect(list) {
+function populateSetSelect(sets) {
   el.setSelect.innerHTML = '';
-  list.forEach((set) => {
+  sets.forEach((set) => {
     const option = document.createElement('option');
     option.value = set.id;
     option.textContent = `${set.name} (${set.abbr ?? 'N/A'})`;
@@ -142,195 +95,104 @@ async function loadSets() {
   setStatus('Loading Pokemon sets...');
   const data = await fetchJson(`${API_BASE}/${POKEMON_CATEGORY}/sets`);
   state.sets = data.sets ?? [];
-  filterSetOptions();
-  renderLockedSets();
-  setStatus(`Loaded ${state.sets.length} set(s).`);
-}
 
-function filterSetOptions() {
   const query = el.setSearch.value.trim().toLowerCase();
   const filtered = query
     ? state.sets.filter((set) => set.name.toLowerCase().includes(query) || (set.abbr ?? '').toLowerCase().includes(query))
     : state.sets;
+
   populateSetSelect(filtered.slice(0, 250));
+  setStatus(`Loaded ${filtered.length} matching set(s).`);
 }
 
-async function getSetProducts(setId) {
-  if (state.setCache.has(setId)) return state.setCache.get(setId);
-  const data = await fetchJson(`${API_BASE}/${POKEMON_CATEGORY}/sets/${setId}`);
-  const products = data.products ?? [];
-  state.setCache.set(setId, products);
-  return products;
+function pickMarketPrice(priceNode) {
+  if (!priceNode?.tcg) return null;
+  const firstSubtype = Object.values(priceNode.tcg)[0];
+  return firstSubtype?.market ?? null;
 }
 
-async function getSetPricing(setId) {
-  if (state.priceCache.has(setId)) return state.priceCache.get(setId);
-  const data = await fetchJson(`${API_BASE}/${POKEMON_CATEGORY}/sets/${setId}/pricing`);
-  const prices = data.prices ?? {};
-  state.priceCache.set(setId, prices);
-  return prices;
-}
+async function findCard() {
+  state.selectedCard = null;
+  el.saveBtn.disabled = true;
+  el.result.innerHTML = '';
 
-function getActiveSetIds() {
-  return state.lockedSetIds.size > 0 ? [...state.lockedSetIds] : state.sets.map((set) => String(set.id));
-}
-
-function parseCollectorNumber(text) {
-  const match = text.match(/\b(\d{1,3})\s*\/\s*\d{2,3}\b/) ?? text.match(/\b(\d{1,3})\b/);
-  return match ? match[1] : '';
-}
-
-function parseLikelyName(text) {
-  const lines = text
-    .split('\n')
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .filter((line) => /^[A-Za-z][A-Za-z\s\-'.]{2,}$/.test(line));
-  return lines[0] ?? '';
-}
-
-async function scanFromCamera() {
-  if (!state.stream) {
-    setStatus('Start camera first.');
-    return;
-  }
-  if (!window.Tesseract) {
-    setStatus('OCR library unavailable.');
-    return;
-  }
-
-  const canvas = el.snapshot;
-  const video = el.video;
-  canvas.width = video.videoWidth;
-  canvas.height = video.videoHeight;
-  const ctx = canvas.getContext('2d');
-  ctx.drawImage(video, 0, 0);
-  el.preview.src = canvas.toDataURL('image/jpeg', 0.85);
-
-  setStatus('Running OCR scan...');
-  const result = await window.Tesseract.recognize(canvas, 'eng');
-  const scannedText = result?.data?.text ?? '';
-
-  const detectedNumber = parseCollectorNumber(scannedText);
-  const detectedName = parseLikelyName(scannedText);
-
-  if (detectedNumber) el.cardNumber.value = detectedNumber;
-  if (detectedName) el.nameFilter.value = detectedName;
-
-  setStatus(`Scan complete.${detectedNumber ? ` Number: ${detectedNumber}.` : ''}${detectedName ? ` Name: ${detectedName}.` : ''}`);
-}
-
-function getVariants(priceNode) {
-  const variants = Object.entries(priceNode?.tcg ?? {});
-  if (variants.length === 0) return [['default', { market: null, low: null }]];
-  return variants;
-}
-
-async function findMatches() {
-  const numberInput = el.cardNumber.value.trim().toLowerCase();
+  const setId = el.setSelect.value;
+  const numberInput = el.cardNumber.value.trim();
   const nameInput = el.nameFilter.value.trim().toLowerCase();
 
-  if (!numberInput && !nameInput) {
-    setStatus('Scan a card (or manually fill number/name) first.');
+  if (!setId) {
+    setStatus('Select a set first.');
     return;
   }
 
-  const activeSetIds = getActiveSetIds();
-  setStatus(`Searching ${activeSetIds.length} set(s)...`);
-  el.result.innerHTML = '';
+  setStatus('Fetching products + pricing...');
 
-  const allMatches = [];
+  const [productsData, pricingData] = await Promise.all([
+    fetchJson(`${API_BASE}/${POKEMON_CATEGORY}/sets/${setId}`),
+    fetchJson(`${API_BASE}/${POKEMON_CATEGORY}/sets/${setId}/pricing`),
+  ]);
 
-  for (const setId of activeSetIds) {
-    const [products, pricing] = await Promise.all([getSetProducts(setId), getSetPricing(setId)]);
+  const products = productsData.products ?? [];
+  const pricing = pricingData.prices ?? {};
 
-    products.forEach((product) => {
-      const productNumber = String(product.number ?? '').toLowerCase();
-      const numberMatch = numberInput ? productNumber === numberInput : true;
-      const nameMatch = nameInput ? product.name.toLowerCase().includes(nameInput) : true;
+  const matches = products.filter((product) => {
+    const numberMatch = numberInput ? String(product.number ?? '').toLowerCase() === numberInput.toLowerCase() : true;
+    const nameMatch = nameInput ? product.name.toLowerCase().includes(nameInput) : true;
+    return numberMatch && nameMatch;
+  });
 
-      if (numberMatch && nameMatch) {
-        const variants = getVariants(pricing[String(product.id)]);
-        allMatches.push({
-          id: product.id,
-          name: product.name,
-          number: product.number,
-          imageUrl: product.image_url,
-          setName: product.set_name,
-          variants,
-        });
-      }
-    });
-  }
-
-  if (allMatches.length === 0) {
-    setStatus('No matches found. Try rescanning or loosening filters.');
+  if (matches.length === 0) {
+    setStatus('No matches found. Try card number or partial card name.');
     return;
   }
 
-  renderMatches(allMatches);
-  setStatus(`Found ${allMatches.length} possible match(es).`);
-}
+  const card = matches[0];
+  const priceNode = pricing[String(card.id)];
+  const market = pickMarketPrice(priceNode);
 
-function saveCard(card, variantName, values) {
-  const collection = readCollection();
-  collection.unshift({
+  state.selectedCard = {
+    productId: card.id,
     name: card.name,
+    setName: card.set_name,
     number: card.number,
-    setName: card.setName,
-    imageUrl: card.imageUrl,
-    variant: variantName,
-    market: values.market ?? null,
-    low: values.low ?? null,
-  });
-  writeCollection(collection);
-  renderCollection();
-  setStatus('Saved selected variant to collection.');
+    imageUrl: card.image_url,
+    market,
+    fullPricing: priceNode?.tcg ?? {},
+  };
+
+  renderSelectedCard();
+  el.saveBtn.disabled = false;
+  setStatus(`Found ${matches.length} match(es). Showing first match.`);
 }
 
-function renderMatches(matches) {
-  el.result.innerHTML = '';
+function renderSelectedCard() {
+  const card = state.selectedCard;
+  if (!card) return;
 
-  matches.forEach((card) => {
-    const wrap = document.createElement('article');
-    wrap.className = 'match-card';
+  const pricingRows = Object.entries(card.fullPricing)
+    .map(([variant, values]) => `<li>${variant}: market $${values.market ?? 'n/a'} | low $${values.low ?? 'n/a'}</li>`)
+    .join('');
 
-    const img = document.createElement('img');
-    img.src = card.imageUrl;
-    img.alt = card.name;
+  el.result.innerHTML = `
+    <img src="${card.imageUrl}" alt="${card.name}" />
+    <h3>${card.name}</h3>
+    <p>Set: ${card.setName}</p>
+    <p>Collector #: ${card.number ?? 'N/A'}</p>
+    <p>Quick market: $${card.market ?? 'n/a'}</p>
+    <details>
+      <summary>All subtype prices</summary>
+      <ul>${pricingRows || '<li>No pricing found.</li>'}</ul>
+    </details>
+  `;
+}
 
-    const title = document.createElement('h3');
-    title.textContent = `${card.name} [${card.setName}] #${card.number ?? 'N/A'}`;
-
-    const variantLabel = document.createElement('label');
-    variantLabel.textContent = 'Variant';
-
-    const variantSelect = document.createElement('select');
-    card.variants.forEach(([variant, values]) => {
-      const option = document.createElement('option');
-      option.value = variant;
-      option.textContent = `${variant} (market $${values.market ?? 'n/a'})`;
-      variantSelect.appendChild(option);
-    });
-
-    const variantDetails = document.createElement('p');
-    const syncVariantText = () => {
-      const selected = card.variants.find(([name]) => name === variantSelect.value) ?? card.variants[0];
-      variantDetails.textContent = `Selected: ${selected[0]} | market $${selected[1].market ?? 'n/a'} | low $${selected[1].low ?? 'n/a'}`;
-    };
-    variantSelect.addEventListener('change', syncVariantText);
-    syncVariantText();
-
-    const saveBtn = document.createElement('button');
-    saveBtn.textContent = 'Save This Variant';
-    saveBtn.addEventListener('click', () => {
-      const selected = card.variants.find(([name]) => name === variantSelect.value) ?? card.variants[0];
-      saveCard(card, selected[0], selected[1]);
-    });
-
-    wrap.append(img, title, variantLabel, variantSelect, variantDetails, saveBtn);
-    el.result.appendChild(wrap);
-  });
+function saveCurrentCard() {
+  if (!state.selectedCard) return;
+  const list = readCollection();
+  list.unshift(state.selectedCard);
+  writeCollection(list);
+  renderCollection();
+  setStatus('Saved card to local collection.');
 }
 
 async function startCamera() {
@@ -351,35 +213,40 @@ function stopCamera() {
   setStatus('Camera stopped.');
 }
 
-function addSetLock() {
-  const selectedId = el.setSelect.value;
-  if (!selectedId) return;
-  state.lockedSetIds.add(String(selectedId));
-  saveLockedSets();
-  renderLockedSets();
-  setStatus('Set lock added.');
+function takeSnapshot() {
+  if (!state.stream) {
+    setStatus('Start camera first.');
+    return;
+  }
+  const canvas = el.snapshot;
+  const video = el.video;
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(video, 0, 0);
+  el.preview.src = canvas.toDataURL('image/jpeg', 0.8);
+  setStatus('Captured reference image (local only).');
 }
 
-el.setSearch.addEventListener('input', filterSetOptions);
-el.addLockBtn.addEventListener('click', addSetLock);
-el.startCameraBtn.addEventListener('click', () => startCamera().catch((error) => setStatus(error.message)));
-el.stopCameraBtn.addEventListener('click', stopCamera);
-el.scanBtn.addEventListener('click', () => scanFromCamera().catch((error) => setStatus(error.message)));
-el.findCardBtn.addEventListener('click', () => findMatches().catch((error) => setStatus(error.message)));
+el.loadSetsBtn.addEventListener('click', () => loadSets().catch((error) => setStatus(error.message)));
+el.findCardBtn.addEventListener('click', () => findCard().catch((error) => setStatus(error.message)));
+el.saveBtn.addEventListener('click', saveCurrentCard);
 el.clearCollectionBtn.addEventListener('click', () => {
   writeCollection([]);
   renderCollection();
   setStatus('Collection cleared.');
 });
+el.startCameraBtn.addEventListener('click', () => startCamera().catch((error) => setStatus(error.message)));
+el.stopCameraBtn.addEventListener('click', stopCamera);
+el.snapBtn.addEventListener('click', takeSnapshot);
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('./sw.js').catch(() => {
-      // App still works without offline cache.
+      // Do nothing; app still works without offline cache.
     });
   });
 }
 
-loadLockedSets();
 renderCollection();
 loadSets().catch((error) => setStatus(error.message));
