@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0f172a" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="stylesheet" href="./styles.css" />
+    <title>Pokemon Scanner</title>
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+  </head>
+  <body>
+    <header>
+      <h1>Pokemon Card Scanner</h1>
+      <p>Scan-first workflow + set locking (iPhone + Windows)</p>
+    </header>
+
+    <main>
+      <section class="card">
+        <h2>1) Lock Sets</h2>
+        <p>Limit scan results to your active sets (ex: Ascended Heroes + Mega Evolutions).</p>
+        <div class="field-row">
+          <label for="setSearch">Find Set</label>
+          <input id="setSearch" type="text" placeholder="Search set name" />
+        </div>
+        <div class="field-row">
+          <label for="setSelect">Set</label>
+          <select id="setSelect"></select>
+          <button id="addLockBtn">Add Lock</button>
+        </div>
+        <div>
+          <strong>Locked Sets</strong>
+          <ul id="lockedSetList"></ul>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>2) Scan Card</h2>
+        <p>Start camera, point at card text, then run OCR scan.</p>
+        <div class="camera-wrap">
+          <video id="video" autoplay playsinline muted></video>
+          <canvas id="snapshot" hidden></canvas>
+        </div>
+        <div class="button-row">
+          <button id="startCameraBtn">Start Camera</button>
+          <button id="stopCameraBtn">Stop Camera</button>
+          <button id="scanBtn">Scan From Camera</button>
+        </div>
+        <img id="preview" alt="Captured preview" />
+        <div class="field-row">
+          <label for="cardNumber">Detected Collector #</label>
+          <input id="cardNumber" type="text" placeholder="Auto-filled from OCR" />
+        </div>
+        <div class="field-row">
+          <label for="nameFilter">Detected Card Name</label>
+          <input id="nameFilter" type="text" placeholder="Auto-filled from OCR" />
+        </div>
+        <button id="findCardBtn">Find Matches</button>
+        <p id="status"></p>
+      </section>
+
+      <section class="card">
+        <h2>3) Choose Match + Variant</h2>
+        <div id="result"></div>
+      </section>
+
+      <section class="card">
+        <h2>My Collection (local only)</h2>
+        <ul id="collectionList"></ul>
+        <button id="clearCollectionBtn">Clear Collection</button>
+      </section>
+    </main>
+
+    <script src="./app.js" type="module"></script>
+  </body>
+</html>
