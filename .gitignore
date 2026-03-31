@@ -26,5 +26,10 @@
 !/docs/**
 !/scripts
 !/scripts/**
+
+# Allow app prototypes
+!/apps/
+!/apps/**
+
 Chaos - Renegade Militarum.cat
 Zephyran Corsairs.cat
